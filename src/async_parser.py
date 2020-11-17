@@ -24,24 +24,24 @@ import aiohttp
 from bs4 import BeautifulSoup
 from selenium import webdriver
 
-from src.async_parser import img_dir
+img_dir = '../img/async'
 from src.utils import get_file_name_from_url
 
 driver = webdriver.Firefox()
 url_link = "https://pixabay.com/"
 
 
-def find_links(url_link):
+async def find_links(url_link):
     driver.get(url_link)
     html = driver.page_source
     soup = BeautifulSoup(html, 'html.parser')
-    clear_links = list()
     links = (elem.get('content') for elem in soup.find_all('meta'))
     for i in links:
         if i is not None:
-            if i.startswith('https') and i.endswith('.jpg') or i.endswith('.png'):
-                clear_links.append(i)
-    return clear_links
+            clear_links = (i for i in links if i.startswith('https') and i.endswith('.jpg') or i.endswith('.png'))
+            for val in clear_links:
+                yield val
+                await asyncio.sleep(0.1)
 
 
 pathlib.Path(img_dir).mkdir(parents=True, exist_ok=True)
@@ -55,7 +55,11 @@ async def download(url):
             await f.close()
 
 
-line = find_links(url_link)
+async def main():
+    async for url in find_links(url_link):
+        await download(url)
+
+
 loop = asyncio.get_event_loop()
-tasks = [download(link) for link in line]
-loop.run_until_complete(asyncio.gather(*tasks))
+tasks = find_links(url_link)
+loop.run_until_complete(main())
